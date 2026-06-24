@@ -16,50 +16,53 @@ function generateFood(snake, boardSize) {
 
 function initializeState(boardSize = {x: 16, y: 16}, snakeSize = 3, tickInterval = 150, optionsCount = 2) {
     function generateRandomDirection() {
+        let allDirections = ["left", "right", "up", "down"];
+
         // find safe directions so that we have place to grow the tail depending on the snakeSize
-        let safeDirections = ["left", "right", "up", "down"];
-        if (headCell.x < snakeSize - 1) {
-            safeDirections.splice(safeDirections.indexOf("right"), 1);
-        }
-        if (headCell.x > boardSize.x - snakeSize) {
-            safeDirections.splice(safeDirections.indexOf("left"), 1);
-        }
-        if (headCell.y < snakeSize - 1) {
-            safeDirections.splice(safeDirections.indexOf("down"), 1);
-        }
-        if (headCell.y > boardSize.y - snakeSize) {
-            safeDirections.splice(safeDirections.indexOf("up"), 1);
-        }
+        let safeDirections = allDirections.filter(function(dir) {
+            if (dir === "right") {
+                return headCell.x >= snakeSize - 1;
+            }
+
+            if (dir === "left") {
+                return headCell.x <= boardSize.x - snakeSize;
+            }
+
+            if (dir === "up") {
+                return headCell.y <= boardSize.y - snakeSize;
+            }
+
+            if (dir === "down") {
+                return headCell.y >= snakeSize - 1;
+            }
+        });
         
-        // choose random direction from what's left
+        // choose random direction from the new safe array
         let randomDirection = safeDirections[Math.floor(Math.random() * safeDirections.length)]
         return randomDirection;
     }
 
     function generateSnake() {
-        let snakeCells = [headCell];
-        switch (direction) {
-            case "left":
-                for (let i = 0; i < snakeSize - 1; i++) {
-                    snakeCells.push({x: snakeCells[snakeCells.length - 1].x + 1, y: headCell.y});
-                }
-                break;
-            case "right":
-                for (let i = 0; i < snakeSize - 1; i++) {
-                    snakeCells.push({x: snakeCells[snakeCells.length - 1].x - 1, y: headCell.y});
-                }
-                break;
-            case "up":
-                for (let i = 0; i < snakeSize - 1; i++) {
-                    snakeCells.push({x: headCell.x, y: snakeCells[snakeCells.length - 1].y + 1});
-                }
-                break;
-            case "down":
-                for (let i = 0; i < snakeSize - 1; i++) {
-                    snakeCells.push({x: headCell.x, y: snakeCells[snakeCells.length - 1].y - 1});
-                }
-                break;
-        }
+        let emptyArray = Array.from({ length: snakeSize }); // [undefined, ... , undefined]
+
+        // _ is the element which is currently undefined and index is the index of that element in the array
+        let snakeCells = emptyArray.map(function(_, index) {
+            if (direction === "left") {
+                return { x: headCell.x + index, y: headCell.y };
+            }
+
+            if (direction === "right") {
+                return { x: headCell.x - index, y: headCell.y };
+            }
+
+            if (direction === "up") {
+                return { x: headCell.x, y: headCell.y + index };
+            }
+
+            if (direction === "down") {
+                return { x: headCell.x, y: headCell.y - index };
+            }
+        });
 
         return snakeCells;
     }
@@ -246,12 +249,12 @@ function draw(state) {
                  cellSize);
     
     ctx.fillStyle = "lime";
-    for (const snakeCell of state.snake) {
+    state.snake.forEach(function(snakeCell) {
         ctx.fillRect(snakeCell.x * cellSize,
                      snakeCell.y * cellSize,
                      cellSize,
                      cellSize);
-    }
+    });
 
     // SCORE
     document.getElementById("score").innerText = "SCORE: " + state.score;
