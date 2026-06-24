@@ -15,52 +15,52 @@ function generateFood(snake, boardSize) {
 }
 
 function initializeState(boardSize = {x: 16, y: 16}, snakeSize = 3, tickInterval = 150, optionsCount = 2) {
-    function generateRandomDirection() {
+    function generateRandomDirection(currentHead, currentSize, currentBoard) {
         let allDirections = ["left", "right", "up", "down"];
 
         // find safe directions so that we have place to grow the tail depending on the snakeSize
         let safeDirections = allDirections.filter(function(dir) {
             if (dir === "right") {
-                return headCell.x >= snakeSize - 1;
+                return currentHead.x >= currentSize - 1;
             }
 
             if (dir === "left") {
-                return headCell.x <= boardSize.x - snakeSize;
+                return currentHead.x <= currentBoard.x - currentSize;
             }
 
             if (dir === "up") {
-                return headCell.y <= boardSize.y - snakeSize;
+                return currentHead.y <= currentBoard.y - currentSize;
             }
 
             if (dir === "down") {
-                return headCell.y >= snakeSize - 1;
+                return currentHead.y >= currentSize - 1;
             }
         });
         
         // choose random direction from the new safe array
-        let randomDirection = safeDirections[Math.floor(Math.random() * safeDirections.length)]
+        let randomDirection = safeDirections[Math.floor(Math.random() * safeDirections.length)];
         return randomDirection;
     }
 
-    function generateSnake() {
-        let emptyArray = Array.from({ length: snakeSize }); // [undefined, ... , undefined]
+    function generateSnake(startHead, currentDir, totalSize) {
+        let emptyArray = Array.from({ length: totalSize }); // [undefined, ... , undefined]
 
         // _ is the element which is currently undefined and index is the index of that element in the array
         let snakeCells = emptyArray.map(function(_, index) {
-            if (direction === "left") {
-                return { x: headCell.x + index, y: headCell.y };
+            if (currentDir === "left") {
+                return { x: startHead.x + index, y: startHead.y };
             }
 
-            if (direction === "right") {
-                return { x: headCell.x - index, y: headCell.y };
+            if (currentDir === "right") {
+                return { x: startHead.x - index, y: startHead.y };
             }
 
-            if (direction === "up") {
-                return { x: headCell.x, y: headCell.y + index };
+            if (currentDir === "up") {
+                return { x: startHead.x, y: startHead.y + index };
             }
 
-            if (direction === "down") {
-                return { x: headCell.x, y: headCell.y - index };
+            if (currentDir === "down") {
+                return { x: startHead.x, y: startHead.y - index };
             }
         });
 
@@ -73,8 +73,8 @@ function initializeState(boardSize = {x: 16, y: 16}, snakeSize = 3, tickInterval
     }
 
     let headCell = getRandomCell(boardSize);
-    let direction = generateRandomDirection();
-    let snake = generateSnake();
+    let direction = generateRandomDirection(headCell, snakeSize, boardSize);
+    let snake = generateSnake(headCell, direction, snakeSize);
     let food = generateFood(snake, boardSize);
 
     let currentState = {
@@ -95,24 +95,24 @@ function initializeState(boardSize = {x: 16, y: 16}, snakeSize = 3, tickInterval
 }
 
 function gameReducer(state, gameEvent) {
-    function onKeyboardInput() {
-        let key = gameEvent.key;
-        let newState = {...state};
-        newState.directionQueue = [...state.directionQueue];
+    function onKeyboardInput(currentState, event) {
+        let key = event.key;
+        let newState = {...currentState};
+        newState.directionQueue = [...currentState.directionQueue];
 
-        let lastDirection = state.directionQueue.length > 0 
-            ? state.directionQueue[state.directionQueue.length - 1] 
-            : state.direction;
+        let lastDirection = currentState.directionQueue.length > 0 
+            ? currentState.directionQueue[currentState.directionQueue.length - 1] 
+            : currentState.direction;
 
 
         switch (key) {
             case "Escape":
-                newState.isGamePaused = !state.isGamePaused;
-                newState.selectedOption = (state.isGameOver) ? 0 : 1;
+                newState.isGamePaused = !currentState.isGamePaused;
+                newState.selectedOption = (currentState.isGameOver) ? 0 : 1;
                 break;
             case "Enter":
-                if (state.isGamePaused) {
-                    switch (state.selectedOption) {
+                if (currentState.isGamePaused) {
+                    switch (currentState.selectedOption) {
                         case 1: // resume
                             newState.isGamePaused = false;
                             break;
@@ -133,8 +133,8 @@ function gameReducer(state, gameEvent) {
                 }
                 break;
             case "ArrowUp":
-                if (state.isGamePaused) {
-                    newState.selectedOption = (state.selectedOption + 1) % state.optionsCount;
+                if (currentState.isGamePaused) {
+                    newState.selectedOption = (currentState.selectedOption + 1) % currentState.optionsCount;
                 } else {
                     if (!((lastDirection === "up") || (lastDirection === "down"))) {
                         newState.directionQueue.push("up");
@@ -142,8 +142,8 @@ function gameReducer(state, gameEvent) {
                 }
                 break;
             case "ArrowDown":
-                if (state.isGamePaused) {
-                    newState.selectedOption = (state.selectedOption - 1 + state.optionsCount) % state.optionsCount;
+                if (currentState.isGamePaused) {
+                    newState.selectedOption = (currentState.selectedOption - 1 + currentState.optionsCount) % currentState.optionsCount;
                 } else {
                     if (!((lastDirection === "up") || (lastDirection === "down"))) {
                         newState.directionQueue.push("down");
@@ -155,25 +155,23 @@ function gameReducer(state, gameEvent) {
         return newState;
     }
 
-    function onTick() {
-        if (state.isGamePaused || state.isGameOver) {
-            return state;
+    function onTick(currentState) {
+        if (currentState.isGamePaused || currentState.isGameOver) {
+            return currentState;
         }
 
-        let newState = {...state};
-        newState.snake = [...state.snake];
-        newState.directionQueue = [...state.directionQueue];
+        let newState = {...currentState};
+        newState.snake = [...currentState.snake];
+        newState.directionQueue = [...currentState.directionQueue];
 
-        function getUpdate() {
+        function getUpdate(currentSnake, currentDir, currentBoard, currentFood) {
         // returns object with properties:
         // action: "MOVE"/"GROW"/"DIE", (for all)
         // newHead: {x: X, y: Y}, (for move and grow)
-            let currentHead = newState.snake[0];
+            let currentHead = currentSnake[0];
             let newHead;
-            let direction = newState.directionQueue.shift() || state.direction;
-            newState.direction = direction;
             
-            switch (direction) {
+            switch (currentDir) {
                 case "left":
                     newHead = {x: currentHead.x - 1, y: currentHead.y};
                     break;
@@ -188,13 +186,13 @@ function gameReducer(state, gameEvent) {
                     break;
             }
             
-            if ((newHead.x >= state.boardSize.x) || (newHead.x < 0) ||
-                (newHead.y >= state.boardSize.y) || (newHead.y < 0)) {
+            if ((newHead.x >= currentBoard.x) || (newHead.x < 0) ||
+                (newHead.y >= currentBoard.y) || (newHead.y < 0)) {
                 return {action: "DIE"};
-            } else if (state.snake.some(cell => (cell.x === newHead.x) && (cell.y === newHead.y))) {
+            } else if (currentSnake.some(cell => (cell.x === newHead.x) && (cell.y === newHead.y))) {
                 return {action: "DIE"};
             } else {
-                if ((newHead.x === state.food.x) && (newHead.y === state.food.y)) {
+                if ((newHead.x === currentFood.x) && (newHead.y === currentFood.y)) {
                     return {action: "GROW", newHead};
                 } else {
                     return {action: "MOVE", newHead};
@@ -202,7 +200,9 @@ function gameReducer(state, gameEvent) {
             }
         }
 
-        let update = getUpdate();
+        let direction = newState.directionQueue.shift() || currentState.direction;
+        newState.direction = direction;
+        let update = getUpdate(newState.snake, direction, currentState.boardSize, currentState.food);
         switch (update.action) {
             case "DIE":
                 newState.isGameOver = true;
@@ -226,34 +226,31 @@ function gameReducer(state, gameEvent) {
 
     switch (gameEvent.type) {
         case "TICK":
-            return onTick();
-            break;
+            return onTick(state);
         case "KEYBOARD_INPUT":
-            return onKeyboardInput();
-            break;
+            return onKeyboardInput(state, gameEvent);
         default:
             console.log("UNKNOWN_EVENT");
             return state;
-            break;
     } 
 }
 
-function draw(state) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function draw(state, context, canvasElement, currentCellSize) {
+    context.clearRect(0, 0, canvasElement.width, canvasElement.height);
     
     // SNAKE & FOOD
-    ctx.fillStyle = "red";
-    ctx.fillRect(state.food.x * cellSize,
-                 state.food.y * cellSize,
-                 cellSize,
-                 cellSize);
+    context.fillStyle = "red";
+    context.fillRect(state.food.x * currentCellSize,
+                 state.food.y * currentCellSize,
+                 currentCellSize,
+                 currentCellSize);
     
-    ctx.fillStyle = "lime";
+    context.fillStyle = "lime";
     state.snake.forEach(function(snakeCell) {
-        ctx.fillRect(snakeCell.x * cellSize,
-                     snakeCell.y * cellSize,
-                     cellSize,
-                     cellSize);
+        context.fillRect(snakeCell.x * currentCellSize,
+                     snakeCell.y * currentCellSize,
+                     currentCellSize,
+                     currentCellSize);
     });
 
     // SCORE
@@ -263,14 +260,14 @@ function draw(state) {
     if (state.isGamePaused) {
         document.getElementById("menu").style.display = "flex"; // show menu
     } else {
-        document.getElementById("menu").style.display = "none" // hide menu
+        document.getElementById("menu").style.display = "none"; // hide menu
     }
 
     if (state.isGameOver) {
         document.getElementById("menuMessage").innerText = "GAME OVER";
-        document.getElementById("resumeOption").style.display = "none" // hide resume
+        document.getElementById("resumeOption").style.display = "none"; // hide resume
     } else {
-        document.getElementById("resumeOption").style.display = "list-item" // show resume
+        document.getElementById("resumeOption").style.display = "list-item"; // show resume
         document.getElementById("menuMessage").innerText = "PAUSED";
         // resume
         if (state.selectedOption === 1) {
@@ -292,23 +289,24 @@ function draw(state) {
     }
 }
 
-function gameTick() {
-    currentState = gameReducer(currentState, {type: "TICK"});
-    draw(currentState);
-}
-
 // get context for drawing
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-const cellSize = canvas.width / 16;
 
 // generate the starting state
 let currentState = initializeState();
+
+const cellSize = canvas.width / currentState.boardSize.x;
+
+function gameTick() {
+    currentState = gameReducer(currentState, {type: "TICK"});
+    draw(currentState, ctx, canvas, cellSize);
+}
 
 // Event Listeners
 const intervalId = setInterval(gameTick, currentState.tickInterval);
 document.addEventListener("keydown", function(event) {
     let key = event.key;
     currentState = gameReducer(currentState, {type: "KEYBOARD_INPUT", key});
-    draw(currentState);
+    draw(currentState, ctx, canvas, cellSize);
 });
